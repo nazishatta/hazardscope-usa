@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#080c15;color:#eaf0fa}
+*{box-sizing:border-box}body{margin:0;padding:10px;background:#080c15} .panel{border:1px solid #263951;border-radius:14px;overflow:hidden;background:#0a1222}
+.hero{padding:13px 16px 5px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.hero strong{font-size:16px}.micro{color:#9fb2cf;font-size:12px}.stage{position:relative;width:100%;aspect-ratio:1.88;min-height:260px;background:radial-gradient(circle at 45% 45%,#13243c,#080d17 75%);}
+canvas{width:100%;height:100%;position:absolute;left:0;top:0}.stage canvas{transition:opacity .32s ease-in-out}.hud{position:absolute;right:12px;top:8px;background:#101c30cc;border:1px solid #30415b;padding:6px 10px;border-radius:8px;font-size:12px;z-index:2}
+.controls{padding:13px 15px;display:grid;gap:12px}.line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.line label{font-size:12px;color:#b3c3da}button{cursor:pointer;background:#172841;border:1px solid #43617f;color:#edfaff;border-radius:8px;padding:8px 12px;font-size:12px}button.primary{background:#19bea5;color:#071521;border-color:#19bea5;font-weight:700}button:focus-visible,input:focus-visible{outline:2px solid #fff08a;outline-offset:2px}button:disabled{opacity:.4;cursor:default}
+input[type=range]{accent-color:#4de3cd;min-width:140px;flex:1}select{background:#15263d;color:#e9f5ff;border:1px solid #38526c;border-radius:6px;padding:7px} .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.group{display:grid;gap:5px}.values{display:flex;justify-content:space-between;color:#a8b9d0;font-size:12px}
+.legend{display:flex;align-items:center;gap:8px;font-size:11px;color:#b9c9df}.scale{height:9px;width:125px;border-radius:8px;background:linear-gradient(90deg,#17436b,#0ea8ae,#9acb55,#fbd865,#ff6377)}
+.note{line-height:1.45;color:#aebfd7;font-size:11px;border-top:1px solid #263951;padding:10px 15px;background:#0b1423} .status{font-variant-numeric:tabular-nums;color:#ffecad;font-size:12px}
+@media(max-width:620px){.row{grid-template-columns:1fr}.stage{min-height:225px}}
+@media(prefers-reduced-motion:reduce){.stage canvas{transition:none}}
+</style></head><body>
+<div class="panel">
+ <div class="hero"><strong>Animated Seismic Density Explorer</strong><span class="micro" id="coverage">USGS event data</span></div>
+ <div class="stage"><canvas id="layerA" aria-label="Geographic density of recorded earthquakes"></canvas><canvas id="layerB" aria-hidden="true"></canvas><div class="hud" id="frameLabel">Loading density…</div></div>
+ <div class="controls">
+  <div class="line"><button class="primary" id="timePlay">▶ Play time</button><button id="thresholdPlay">▶ Play magnitude</button><button id="pause">Ⅱ Pause</button><button id="reset">↺ Reset</button><span class="status" id="status" role="status">Ready</span></div>
+  <div class="row">
+   <div class="group"><div class="values"><label for="timeRange">Time progression · cumulative recorded events</label><span id="timeText"></span></div><input type="range" id="timeRange" min="0" max="19" value="19" step="1"/></div>
+   <div class="group"><div class="values"><label for="magRange">Minimum magnitude</label><span id="magText"></span></div><input type="range" id="magRange" min="0" max="8" step="0.5" value="0"/></div>
+  </div>
+  <div class="line"><label for="mode">Density meaning</label><select id="mode"><option value="count">Event-count density</option><option value="weighted">Magnitude-weighted density</option></select><label for="speed">Playback speed</label><select id="speed"><option value="1400">Slow</option><option selected value="850">Normal</option><option value="400">Fast</option></select><label for="smooth">Smoothing</label><input style="max-width:110px" type="range" id="smooth" min="1" max="5" value="2" step="1"/></div>
+  <div class="line" style="justify-content:space-between"><div class="legend"><div class="scale"></div><span>Low → High (fixed within each density mode)</span></div><span class="micro" id="eventCount"></span></div>
+ </div>
+ <div class="note">Density shows the geographic concentration of recorded events, <b>not</b> earthquake probability, shaking intensity, risk, or observed damage. Weighted mode sums <b>(max(0, magnitude)+1)²</b> for each earthquake as an illustrative emphasis; this is <b>not</b> seismic energy or a calibrated hazard score. Time playback accumulates events from the fetched window. Changing magnitude filters the same fetched records; to include smaller events, lower the USGS minimum-magnitude setting and Fetch again. Geographic outlines are approximate context; state selection uses the USGS query bounding box.</div>
+</div>
+<script>
+const data=__SEISMIC_DATA__;
+const ev=data.events.map(e=>({lon:e[0],lat:e[1],m:e[2],t:Date.parse(e[3])})).filter(e=>Number.isFinite(e.t));
+const el=id=>document.getElementById(id), stage=document.querySelector('.stage');
+const a=el('layerA'), b=el('layerB');let front=a,back=b,playing=null,timer=null,token=0;
+const initialMin=Math.max(0,Math.floor(Math.min(...ev.map(e=>e.m))*2)/2),maxMag=Math.ceil(Math.max(...ev.map(e=>e.m))*2)/2;
+const mag=el('magRange');mag.min=initialMin;mag.max=Math.max(maxMag,initialMin+.5);mag.value=initialMin;
+let tIndex=19, currentMag=initialMin, mode='count',smoothing=2;
+const minT=Math.min(...ev.map(e=>e.t)),maxT=Math.max(...ev.map(e=>e.t));
+const toDate=t=>new Date(t).toISOString().slice(0,16).replace('T',' ')+' UTC';
+el('coverage').textContent=ev.length.toLocaleString()+' fetched events · '+data.region;
+const [west,east,south,north]=data.bounds;
+function mapCoords(lon,lat,w,h){return [(lon-west)/(east-west)*w,(north-lat)/(north-south)*h]}
+function frameTime(i){return minT+(maxT-minT)*(i+1)/20}
+const gx=96,gy=55;const cellN=gx*gy;
+function weight(m,type){return type==='count'?1:(Math.max(0,m)+1)**2}
+function buildGrid(endTime,threshold,type,sigma){
+ const grid=new Float32Array(cellN);const rad=Math.max(1,sigma),denom=2*rad*rad;
+ for(const e of ev){if(e.t>endTime||e.m<threshold)continue;
+   const x=Math.floor((e.lon-west)/(east-west)*gx),y=Math.floor((north-e.lat)/(north-south)*gy);
+   if(x<0||y<0||x>=gx||y>=gy)continue;
+   const v=weight(e.m,type);const span=Math.ceil(rad*2.3);
+   for(let dy=-span;dy<=span;dy++)for(let dx=-span;dx<=span;dx++){
+    const px=x+dx,py=y+dy;if(px>=0&&py>=0&&px<gx&&py<gy)grid[py*gx+px]+=v*Math.exp(-(dx*dx+dy*dy)/denom);
+   }
+ }
+ return grid;
+}
+const maxima={};function getMax(type,sigma){const key=type+sigma;if(maxima[key])return maxima[key];
+ const grid=buildGrid(maxT,initialMin,type,sigma);let max=0;for(const v of grid)max=Math.max(max,v);
+ maxima[key]=max||1;return maxima[key];
+}
+function color(v){const stops=[[8,22,42],[21,69,119],[14,169,173],[165,206,86],[249,214,95],[255,94,111]];
+ const n=Math.min(4.999,Math.max(0,v*5)),i=Math.floor(n),k=n-i;
+ const one=stops[i],two=stops[i+1];return [0,1,2].map(j=>Math.round(one[j]*(1-k)+two[j]*k));}
+function drawShape(ctx,w,h){
+ const geom=data.outline;if(!geom)return;
+ const polys=geom.type==='MultiPolygon'?geom.coordinates:geom.type==='Polygon'?[geom.coordinates]:[];
+ ctx.save();ctx.beginPath();for(const poly of polys){for(const ring of poly){let drawn=false;for(const p of ring){
+ const [x,y]=mapCoords(p[0],p[1],w,h);if(!Number.isFinite(x+y))continue;
+ if(!drawn){ctx.moveTo(x,y);drawn=true}else ctx.lineTo(x,y);
+ }if(drawn)ctx.closePath();}}
+ ctx.fillStyle='#142038';ctx.strokeStyle='#40546e';ctx.lineWidth=0.8;ctx.fill('evenodd');ctx.stroke();ctx.restore();
+}
+function draw(target){
+ const dpr=Math.min(window.devicePixelRatio||1,1.5),w=Math.round(stage.clientWidth),h=Math.round(stage.clientHeight);
+ target.width=Math.round(w*dpr);target.height=Math.round(h*dpr);const ctx=target.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.fillStyle='#090f1a';ctx.fillRect(0,0,w,h);drawShape(ctx,w,h);
+ ctx.strokeStyle='#26374f';ctx.lineWidth=.55;ctx.setLineDash([3,6]);
+ for(let lon=Math.ceil(west/10)*10;lon<east;lon+=10){const [x]=mapCoords(lon,0,w,h);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}
+ for(let lat=Math.ceil(south/10)*10;lat<north;lat+=10){const [,y]=mapCoords(0,lat,w,h);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+ ctx.setLineDash([]);
+ const end=frameTime(tIndex),grid=buildGrid(end,currentMag,mode,smoothing),max=getMax(mode,smoothing);
+ // Draw semi-transparent gridded intensity via offscreen canvas with a small blur.
+ const off=document.createElement('canvas');off.width=gx;off.height=gy;const oc=off.getContext('2d');const img=oc.createImageData(gx,gy);
+ for(let i=0;i<cellN;i++){
+   const normalized=Math.min(1,grid[i]/max),alpha=Math.pow(normalized,.65);
+   const [r,g,bl]=color(normalized);const k=i*4;
+   img.data[k]=r;img.data[k+1]=g;img.data[k+2]=bl;img.data[k+3]=Math.round(alpha*235);
+ }
+ oc.putImageData(img,0,0);ctx.save();ctx.filter='blur(7px)';ctx.drawImage(off,0,0,w,h);ctx.restore();
+ const filtered=ev.filter(e=>e.t<=end&&e.m>=currentMag);
+ if(filtered.length<=1300){for(const e of filtered){const [x,y]=mapCoords(e.lon,e.lat,w,h);if(x<0||x>w||y<0||y>h)continue;
+ ctx.beginPath();ctx.arc(x,y,Math.max(1.3,Math.min(3.8,1.2+e.m*.3)),0,Math.PI*2);ctx.fillStyle='#f6f3be';ctx.globalAlpha=.68;ctx.fill();}}
+ ctx.globalAlpha=1;el('timeText').textContent=toDate(end);el('magText').textContent='M '+currentMag.toFixed(1)+'+';
+ el('eventCount').textContent=filtered.length.toLocaleString()+' matching recorded events';el('frameLabel').textContent=toDate(end)+' · M ≥ '+currentMag.toFixed(1);
+}
+function stop(){if(timer)clearInterval(timer);timer=null;playing=null;el('status').textContent='Paused';}
+function repaint(){token++;const target=back;draw(target);target.style.opacity='1';front.style.opacity='0';[front,back]=[back,front];}
+function tick(){if(playing==='time'){tIndex=tIndex===19?0:tIndex+1;el('timeRange').value=tIndex;}
+ else if(playing==='mag'){currentMag=currentMag+.5>+mag.max?initialMin:currentMag+.5;mag.value=currentMag;}
+ repaint();}
+function start(kind){stop();playing=kind;el('status').textContent=kind==='time'?'Playing recorded-time evolution':'Playing magnitude thresholds';
+ if(kind==='time'&&tIndex===19){tIndex=0;el('timeRange').value='0'}
+ if(kind==='mag'&&currentMag>=+mag.max){currentMag=initialMin;mag.value=currentMag}
+ repaint();timer=setInterval(tick,+el('speed').value);
+}
+el('timePlay').addEventListener('click',()=>start('time'));
+el('thresholdPlay').addEventListener('click',()=>start('mag'));
+el('pause').addEventListener('click',stop);
+el('reset').addEventListener('click',()=>{stop();tIndex=19;currentMag=initialMin;el('timeRange').value='19';mag.value=currentMag;repaint();});
+el('timeRange').addEventListener('input',e=>{stop();tIndex=+e.target.value;repaint();});
+mag.addEventListener('input',e=>{stop();currentMag=+e.target.value;repaint();});
+el('mode').addEventListener('change',e=>{mode=e.target.value;repaint();});
+el('smooth').addEventListener('input',e=>{smoothing=+e.target.value;repaint();});
+el('speed').addEventListener('change',()=>{if(playing){const kind=playing;stop();playing=kind;el('status').textContent='Playing '+kind;timer=setInterval(tick,+el('speed').value);}});
+let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(repaint,150)});
+window.addEventListener('pagehide',stop);document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+back.style.opacity='0';draw(front);start('time'); // HAZARDSCOPE_SEISMIC_AUTOPLAY_V1
+</script></body></html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+:root{color-scheme:dark;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}*{box-sizing:border-box}body{margin:0;background:transparent;color:#e9f3ff}.wrap{border:1px solid #2b415b;background:linear-gradient(135deg,#06101e,#0b1e32);border-radius:18px;padding:14px}.top,.foot,.controls{display:flex;gap:11px;justify-content:space-between;align-items:center;flex-wrap:wrap}.title{font-size:15px;font-weight:750}.sub,.muted{color:#a5b9ce;font-size:11px}.mark{color:#2de1d1;font-size:11px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:12px;margin-top:12px}.chart{position:relative;min-height:460px;background:#071525;border:1px solid #223f57;border-radius:12px;overflow:hidden}.chart canvas{width:100%;height:460px;display:block}.chart #series[hidden]{display:none}.chart.flood-view #scene{height:320px}.chart.flood-view #series{height:225px;border-top:1px solid #29445e}.chart.fema-view #scene{height:480px}.chart .legend{z-index:3}.category-note{padding:8px 12px;font-size:11px;color:#a6c4d5;border-top:1px solid #243d54}.category-note:empty{display:none}.detail{border:1px solid #29445e;border-radius:12px;padding:15px;background:#102138}.detail .year{font-size:30px;color:#39e3d6;font-weight:750;margin:9px 0}.detail h3{font-size:18px;line-height:1.25;margin:4px 0 12px}.detail .loc{font-size:12px;color:#bfd0e1;line-height:1.5}.detail .data{margin-top:15px;font-size:12px;color:#fac97a}.detail .desc{border-top:1px solid #2d455a;padding-top:15px;margin-top:16px;font-size:12px;color:#a8bbce;line-height:1.6}.legend{position:absolute;left:12px;top:12px;display:flex;gap:8px;padding:7px 10px;background:#081b30cc;border-radius:8px;font-size:11px;color:#dbe9f3}.legend b{color:#3ee5d4}.controls{padding-top:12px}.controlbtn{background:#153650;color:#dff6ff;border:1px solid #3a6383;border-radius:7px;padding:7px 11px;cursor:pointer;font-size:12px}.controlbtn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #34dbcb}#pause{background:#0bbba1;border-color:#0bbba1;color:#001d25;font-weight:700}.progress{flex:1;min-width:140px;accent-color:#24d8c6}.small{font-size:11px;color:#8db3cc}select{background:#10283d;color:white;border:1px solid #37607c;border-radius:7px;padding:7px}.foot{padding-top:10px;border-top:1px solid #264359;margin-top:12px;color:#9eb2c8;font-size:11px;line-height:1.5}@media(max-width:650px){.layout{grid-template-columns:1fr}.chart,.chart canvas{height:320px;min-height:320px}.chart.flood-view{height:auto;min-height:0}.chart.flood-view #scene{height:235px}.chart.flood-view #series{height:220px}.chart.fema-view #scene{height:400px}.detail{min-height:145px}}
+</style></head><body><div class="wrap"><div class="top"><span class="title">◈ Historical Disaster Intelligence <span class="mark">· Recorded observations</span></span><span class="sub">AUTO-PLAY · <span id="meta">0 records</span></span></div><div class="layout"><div class="chart"><canvas id="scene" aria-label="Historical event location map"></canvas><canvas id="series" aria-label="Historical daily discharge line chart" hidden></canvas><div class="category-note" id="category-note"></div><div class="legend"><b>●</b> Historical source/event coordinates <span class="muted">· motion is illustrative</span></div></div><aside class="detail"><div class="muted">SELECTED HISTORICAL RECORD</div><div class="year" id="yr">—</div><h3 id="name">Loading official records</h3><div class="loc" id="place"></div><div class="data" id="measure"></div><div class="desc" id="info"></div></aside></div><div class="controls"><button class="controlbtn" id="pause">⏸ Pause</button><button class="controlbtn" id="reset">↺ Restart</button><span class="small">Record</span><input type="range" class="progress" id="scrub" min="0" max="0" value="0" aria-label="Select a historical record"><span class="small" id="position">0 / 0</span><select id="speed" aria-label="Playback speed"><option value="2200">Slow</option><option value="1200" selected>Normal</option><option value="550">Fast</option></select></div><div class="foot"><span id="caveat"></span><span>NOAA · NIFC · USGS · FEMA | Official-source historical records</span></div></div><script>
+const events=/*__EVENTS__*/;const land=/*__LAND__*/;const kind=/*__CATEGORY__*/;const caveat=/*__CAVEAT__*/;
+const el=id=>document.getElementById(id),c=el('scene'),ctx=c.getContext('2d'),series=el('series'),sctx=series.getContext('2d');let i=0,running=true,period=1200,last=0,entryTime=performance.now();let w=800,h=460;const palette={hurricanes:'#38e0d8',tsunamis:'#23dfe6',wildfires:'#ff984a',floods:'#49bffc',fema:'#f4c96a'};const accent=palette[kind]||'#35dbc8';
+const text=v=>v===undefined||v===null||v===''?'Not reported':String(v);
+const S=s=>s.replace(/[&<>\"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[x]));
+const fmt=v=>typeof v==='number'?v.toLocaleString(undefined,{maximumFractionDigits:1}):text(v);
+function resize(){const box=c.getBoundingClientRect();w=Math.max(280,box.width);h=Math.max(200,box.height);const d=Math.min(devicePixelRatio||1,2);c.width=w*d;c.height=h*d;ctx.setTransform(d,0,0,d,0,0);if(kind==='floods'){const b=series.getBoundingClientRect();series.width=Math.max(280,b.width)*d;series.height=Math.max(150,b.height)*d;sctx.setTransform(d,0,0,d,0,0)}}
+new ResizeObserver(resize).observe(c);resize();
+function coord(lon,lat){if(kind==='floods')return [((lon+128)/64)*w,((53-lat)/31)*h];return [((lon+180)/360)*w,((90-lat)/180)*h]}
+function world(){ctx.fillStyle='#061525';ctx.fillRect(0,0,w,h);ctx.strokeStyle='rgba(62,105,130,.17)';ctx.lineWidth=1;for(let x=0;x<w;x+=w/12){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let y=0;y<h;y+=h/6){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}ctx.fillStyle='#112d40';ctx.strokeStyle='#2b4d66';ctx.lineWidth=.65;for(const poly of land){if(poly.length<3)continue;ctx.beginPath();let first=true;for(const p of poly){const q=coord(p[0],p[1]);if(first){ctx.moveTo(q[0],q[1]);first=false}else ctx.lineTo(q[0],q[1])}ctx.closePath();ctx.fill();ctx.stroke()}}
+function dot(lon,lat,r,col,alpha=1){const [x,y]=coord(lon,lat);ctx.globalAlpha=alpha;ctx.fillStyle=col;ctx.shadowBlur=13;ctx.shadowColor=col;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1}
+function polyline(points,proportion=1){if(!points||points.length<2)return;const n=Math.max(2,Math.floor(points.length*proportion));ctx.beginPath();ctx.strokeStyle=accent;ctx.lineWidth=2.4;ctx.shadowColor=accent;ctx.shadowBlur=8;let prev=null;for(let k=0;k<n;k++){const p=points[k];if(!Number.isFinite(+p.lon)||!Number.isFinite(+p.lat))continue;const q=coord(+p.lon,+p.lat);if(!prev||Math.abs(q[0]-prev[0])>w*.35)ctx.moveTo(q[0],q[1]);else ctx.lineTo(q[0],q[1]);prev=q}ctx.stroke();ctx.shadowBlur=0;const p=points[n-1];if(p&&p.lon!==undefined)dot(+p.lon,+p.lat,5,accent)}
+// An intentionally schematic state tile map: each tile corresponds to an official FEMA state code.
+// It is not a Census polygon choropleth; avoid implying border shape or geographic precision.
+const tiles=[
+ ['WA',0,0],['MT',2,0],['ND',4,0],['MN',5,0],['WI',6,0],['MI',7,0],['VT',10,0],['ME',11,0],
+ ['OR',0,1],['ID',1,1],['WY',2,1],['SD',4,1],['IA',5,1],['IL',6,1],['IN',7,1],['OH',8,1],['NY',9,1],['NH',10,1],
+ ['CA',0,2],['NV',1,2],['UT',2,2],['CO',3,2],['NE',4,2],['MO',5,2],['KY',6,2],['WV',7,2],['PA',8,2],['NJ',9,2],['MA',10,2],
+ ['AZ',1,3],['NM',2,3],['KS',4,3],['AR',5,3],['TN',6,3],['VA',7,3],['MD',8,3],['DE',9,3],['CT',10,3],['RI',11,3],
+ ['OK',4,4],['LA',5,4],['MS',6,4],['AL',7,4],['NC',8,4],
+ ['TX',4,5],['GA',7,5],['SC',8,5],['FL',9,5],
+ ['AK',0,6],['HI',1,6],['DC',10,5]
+];
+function drawFema(){
+ ctx.fillStyle='#061525';ctx.fillRect(0,0,w,h);
+ const subset=events.slice(0,i+1),counts={};let total=0;
+ for(const e of subset){const state=String(e.location||'').trim().toUpperCase();if(state.length===2){counts[state]=(counts[state]||0)+1;total++}}
+ const max=Math.max(1,...Object.values(counts));
+ const margin=17,top=72,tileW=Math.min((w-2*margin)/12.4,(h-top-65)/7.8*1.6),tileH=tileW*.69;
+ const ox=(w-tileW*12.2)/2,oy=top;
+ ctx.font='bold 14px sans-serif';ctx.fillStyle='#d8e8f4';ctx.fillText('FEMA declarations by state · cumulative through '+(events[i]?.year||'—'),18,28);
+ ctx.font='11px sans-serif';ctx.fillStyle='#9ebbd0';ctx.fillText('State tiles are schematic · each declaration counted once in its recorded state',18,46);
+ for(const [abbr,col,row] of tiles){const x=ox+col*tileW*1.015,y=oy+row*tileH*1.075;const count=counts[abbr]||0;
+  const t=count?Math.log1p(count)/Math.log1p(max):0;
+  ctx.fillStyle=count?`hsl(${182-150*t} 82% ${21+34*t}%)`:'#152c40';
+  ctx.strokeStyle=(abbr===String(events[i]?.location||'').toUpperCase())?'#ffd47a':'#39546c';ctx.lineWidth=(abbr===String(events[i]?.location||'').toUpperCase())?2.3:.6;
+  ctx.beginPath();ctx.roundRect(x,y,tileW*.92,tileH*.94,3);ctx.fill();ctx.stroke();
+  if(tileW>26){ctx.textAlign='center';ctx.font=`${Math.max(9,Math.min(12,tileW*.27))}px sans-serif`;ctx.fillStyle=count&&t>.6?'#08202b':'#d9e9f5';ctx.fillText(abbr,x+tileW*.46,y+tileH*.58);ctx.textAlign='left'}
+ }
+ const bottom=h-16;ctx.fillStyle='#a6bdce';ctx.font='11px sans-serif';
+ ctx.fillText(`${total.toLocaleString()} declarations in displayed states · ${Object.keys(counts).length} states/jurisdictions represented`,18,bottom);
+}
+function drawFloodMap(){
+ world();const legend=el('category-note');
+ for(const e of events){if(Number.isFinite(+e.lon)&&Number.isFinite(+e.lat))dot(+e.lon,+e.lat,e===events[i]?7:4,e===events[i]?accent:'#88adc2',e===events[i]?1:.78)}
+ ctx.fillStyle='#d9eaf4';ctx.font='bold 13px sans-serif';ctx.fillText('USGS monitoring stations · recorded locations',15,26);
+ ctx.fillStyle='#a4bed1';ctx.font='11px sans-serif';ctx.fillText('Selected station highlighted · daily discharge plotted separately below',15,44);
+}
+function drawFloodSeries(now){
+ const box=series.getBoundingClientRect(),cw=box.width,ch=box.height;if(cw<10||ch<10)return;
+ sctx.fillStyle='#071525';sctx.fillRect(0,0,cw,ch);
+ const path=events[i]?.path||[];const vals=path.map(p=>Number(p.value)).filter(Number.isFinite);
+ const max=Math.max(1,...vals)*1.08, min=0;
+ const left=68,right=cw-22,top=32,bottom=ch-44;
+ sctx.strokeStyle='#36516b';sctx.lineWidth=1;sctx.font='11px sans-serif';sctx.fillStyle='#a7bfd0';
+ for(let k=0;k<4;k++){const val=max*k/3,y=bottom-(bottom-top)*k/3;sctx.beginPath();sctx.moveTo(left,y);sctx.lineTo(right,y);sctx.stroke();sctx.fillText(Math.round(val).toLocaleString(),7,y+3)}
+ sctx.fillStyle='#d9eaf4';sctx.font='bold 12px sans-serif';sctx.fillText('Daily mean discharge (cfs) · USGS 2024',12,18);
+ if(path.length<2)return;
+ const first=String(path[0].date||''),lastDate=String(path.at(-1).date||'');sctx.fillStyle='#a8bdcf';sctx.font='11px sans-serif';sctx.fillText(first,left,bottom+20);sctx.textAlign='right';sctx.fillText(lastDate,right,bottom+20);sctx.textAlign='left';
+ const phase=(now-entryTime)/period, n=Math.max(2,Math.min(path.length,Math.floor(path.length*Math.max(0,phase))));
+ sctx.beginPath();sctx.strokeStyle=accent;sctx.lineWidth=2.3;
+ for(let k=0;k<n;k++){const v=Number(path[k].value);if(!Number.isFinite(v))continue;const x=left+(right-left)*k/Math.max(1,path.length-1),y=bottom-(bottom-top)*(v-min)/(max-min);if(k===0)sctx.moveTo(x,y);else sctx.lineTo(x,y)}sctx.stroke();
+ const last=path[n-1];if(last&&Number.isFinite(+last.value)){const x=left+(right-left)*(n-1)/Math.max(1,path.length-1),y=bottom-(bottom-top)*Number(last.value)/(max-min);sctx.fillStyle='#ffce7b';sctx.beginPath();sctx.arc(x,y,4,0,Math.PI*2);sctx.fill()}
+}
+function draw(now){
+ const record=events[i];if(!record){requestAnimationFrame(draw);return}
+ if(kind==='fema'){drawFema()}
+ else if(kind==='floods'){drawFloodMap();drawFloodSeries(now)}
+ else{world();const start=Math.max(0,i-270);for(let k=start;k<i;k++){const e=events[k];if(Number.isFinite(e.lon)&&Number.isFinite(e.lat))dot(e.lon,e.lat,Math.min(5,2+Math.sqrt(Math.max(0,e.value||0))/8),accent,.20)}
+  if(kind==='hurricanes'&&record.path){let f=((now-entryTime)%period)/period;polyline(record.path,Math.max(.03,f));}
+  else if(Number.isFinite(record.lon)&&Number.isFinite(record.lat)){const [x,y]=coord(record.lon,record.lat);const phase=((now-entryTime)%period)/period;ctx.strokeStyle=accent;ctx.lineWidth=2;ctx.globalAlpha=.8*(1-phase);ctx.beginPath();ctx.arc(x,y,8+phase*42,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;dot(record.lon,record.lat,6,accent)}
+ }
+ requestAnimationFrame(draw)
+}
+function update(){const e=events[i];if(!e)return;el('yr').textContent=e.year;el('name').textContent=text(e.name);el('place').textContent=text(e.location);el('measure').textContent=e.value===null||e.value===undefined?'Impact measure not reported':fmt(e.value)+' '+text(e.unit);el('info').textContent=text(e.detail);el('position').textContent=`${i+1} / ${events.length}`;el('scrub').value=i;entryTime=performance.now()}
+function tick(t){if(running&&t-last>=period&&events.length){i=(i+1)%events.length;update();last=t}requestAnimationFrame(tick)}
+if(kind==='floods'){document.querySelector('.chart').classList.add('flood-view');series.hidden=false;el('category-note').textContent='Station map above; discharge chart below uses true date and cfs axes. High discharge alone does not establish a flood.';document.querySelector('.legend').style.display='none';}
+if(kind==='fema'){document.querySelector('.chart').classList.add('fema-view');el('category-note').textContent='Schematic U.S. state tile map (not polygons). Colors encode cumulative counts; unmatched or non-state jurisdictions are not plotted.';document.querySelector('.legend').style.display='none';}
+el('meta').textContent=`${events.length.toLocaleString()} records`;
+el('scrub').max=Math.max(0,events.length-1);el('caveat').textContent=caveat;
+el('pause').onclick=()=>{running=!running;el('pause').textContent=running?'⏸ Pause':'▶ Resume';last=performance.now()};
+el('reset').onclick=()=>{i=0;last=performance.now();update()};
+el('speed').onchange=e=>{period=+e.target.value;last=performance.now()};
+el('scrub').oninput=e=>{i=+e.target.value;last=performance.now();update()};
+update();requestAnimationFrame(draw);requestAnimationFrame(tick);
+</script></body></html>

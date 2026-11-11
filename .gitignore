@@ -1,0 +1,33 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.DS_Store
+.streamlit/secrets.toml
+*.log
+
+.streamlit/secrets.toml
+.env
+.venv/
+__pycache__/
+*.pyc
+data/seismic_geography/
+
+# Private configuration
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Python environment
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local backups and logs
+*.bak
+*_before_*.py
+*_before_*.html
+*.log
+.DS_Store
