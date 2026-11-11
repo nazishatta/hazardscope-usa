@@ -208,9 +208,11 @@ with t3:
             st.markdown('''**Play time:** Events accumulate in recorded chronological order. The date slider lets you scrub the same dataset.\n\n**Play magnitude:** Raising the threshold hides smaller recorded events; it does not represent earthquakes growing stronger.\n\n**Event-count density:** Each event contributes equally. **Magnitude-weighted density:** Higher-magnitude events receive more weight using an illustrative transform, not physical seismic energy.\n\n**Smoothing:** Blends nearby epicenters into broader hotspots. Brighter areas mean greater displayed concentration, **not** measured shaking, damage, future probability or risk.\n\nUSGS geographic selection uses a bounding box; records and reporting coverage vary, and the downloaded query may be limited.''')
         # HAZARDSCOPE_ASSIGNMENT_GEOGRAPHY_V2: joined seismic geography (Earthquakes only)
         render_seismic_geography(quakes, region_choice, st.session_state.get('key_quakes'), st.session_state.get('meta_quakes'))
-        left,right=st.columns(2)
-        with left:st.plotly_chart(timeline_fig(quakes),width='stretch')
-        with right:st.plotly_chart(depth_fig(quakes),width='stretch')
+        # HAZARDSCOPE_DBSCAN_COORDINATED_BONUS_V1 · Earthquakes tab only
+        from src.quake_bonus import render_coordinated, render_dbscan
+        render_coordinated(quakes)
+        with st.expander('DBSCAN clustering · sensitivity analysis (bonus)', expanded=True):
+            render_dbscan(quakes, region_choice, bool((st.session_state.get('meta_quakes') or {}).get('truncated')))
         with st.expander('Explore individual earthquake epicenters (magnitude and depth)', expanded=False):
             fig=earthquake_map(quakes,marker_scale,show_map_density,heat_blur)
             st.plotly_chart(fig,width='stretch')
