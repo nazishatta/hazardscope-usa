@@ -48,6 +48,18 @@ st.sidebar.markdown('## ◈ HazardScope USA')
 st.sidebar.caption('LIVE SOURCES · INTERACTIVE RESEARCH')
 region_choice=st.sidebar.selectbox('State / region',['US']+STATE_CODES,
     format_func=lambda c: '🇺🇸 United States · broad region' if c=='US' else f'{state_name(c)} ({c})')
+# HAZARDSCOPE_DBSCAN_ANIMATED_V2 · button immediately under State / region
+# HAZARDSCOPE_DBSCAN_SIDEBAR_SHORTCUT_V1
+# Shortcut is a deliberate USGS Fetch action if no matching records are loaded.
+st.sidebar.markdown('**Assignment bonus · Quick access**')
+dbscan_shortcut_clicked = st.sidebar.button(
+    '🧭 Jump to DBSCAN Clustering', key='haz_dbscan_jump', width='stretch',
+    help='Open Tab 03 with the actual DBSCAN cluster map first; fetch USGS data for these controls if needed.'
+)
+if dbscan_shortcut_clicked:
+    st.session_state['haz_dbscan_focus'] = True
+    st.session_state['haz_main_tab'] = '03 · Earthquakes'
+
 center=center_for(region_choice)
 st.sidebar.caption(f'Map center: {center[0]:.2f}°, {center[1]:.2f}° · USGS uses a geographic bounding box, not an exact state border.')
 st.sidebar.divider()
@@ -80,6 +92,7 @@ alert_key=region_choice
 weather_key=(round(selected_center[0],3),round(selected_center[1],3),forecast_days)
 fema_key=(region_choice,fema_year)
 
+
 def do_fetch(source,key,callback):
     with st.spinner('Fetching and validating '+source+'…'):
         try:
@@ -100,6 +113,11 @@ if fetch_weather:
         cur,hour,meta=cache_weather(*weather_key)
         return (cur,hour),meta
     do_fetch('weather',weather_key,weather_call)
+
+if dbscan_shortcut_clicked:
+    # This click explicitly requests a current USGS dataset; do not reuse stale regions/filters.
+    if st.session_state.get('data_quakes') is None or st.session_state.get('key_quakes') != quake_key:
+        do_fetch('quakes', quake_key, lambda: cache_quakes(days,mag,depth,tuple(bounds)))
 
 # Streamlit fragment heartbeats are active only while this session is open.
 # A full-app rerun is needed so the charts and headline metrics see refreshed data.
@@ -170,9 +188,21 @@ for src,key in [('quakes',quake_key),('alerts',alert_key),('fema',fema_key),('we
     if st.session_state['data_'+src] is not None and st.session_state['key_'+src]!=key:
         st.warning(f'{src.upper()}: controls have changed since the last fetch. The saved result belongs to the earlier query; fetch again to update it.',icon='⚠️')
 
-t1,t2,t3,t4,t5,t6=st.tabs(['01 · Disaster history','02 · Wind streamlines','03 · Earthquakes','04 · Active alerts & tsunami','05 · Cross-source research','06 · Methods & sources'])
+t1,t2,t3,t4,t5,t6=st.tabs(['01 · Disaster history','02 · Wind streamlines','03 · Earthquakes','04 · Active alerts & tsunami','05 · Cross-source research','06 · Methods & sources'], key='haz_main_tab', on_change='rerun')
 
 with t3:
+    # When using the sidebar shortcut, put DBSCAN first rather than scrolling through charts.
+    if st.session_state.get('haz_dbscan_focus'):
+        st.markdown('### DBSCAN · Spatial Clustering — Assignment Bonus')
+        if quakes is not None and not quakes.empty:
+            from src.quake_bonus import render_dbscan
+            render_dbscan(quakes, region_choice, bool((st.session_state.get('meta_quakes') or {}).get('truncated')))
+        else:
+            st.warning('No matching USGS earthquakes are loaded. Use Fetch Recent Earthquakes below or the sidebar Fetch button, then return to this section.')
+        if st.button('↩ Return to standard Earthquakes layout', key='haz_dbscan_focus_off'):
+            st.session_state['haz_dbscan_focus'] = False
+            st.rerun()
+        st.divider()
     st.subheader('Where are earthquakes concentrated?')
     if quake_fetch_is_stale:
         st.warning(
@@ -204,6 +234,8 @@ with t3:
         c.metric('Fetched period', f'{quake_fetched_key[0]} days' if quake_fetched_key else '—')
         st.caption(f'**Source:** USGS Earthquake Catalog · Fetched: {quake_fetch_time} · Uses stored API results; animation makes no new requests.')
         seismic_components.html(seismic_animation_html(quakes, region_choice, bounds), height=900, scrolling=False)
+        # HAZARDSCOPE_ASSIGNMENT_CAPTIONS_V1: animated seismic map
+        st.caption('**Animated seismic-density map:** USGS earthquake epicenters in a longitude/latitude geographic display with U.S. outlines for context; event-count density accumulates reported observations through UTC time. Optional magnitude-weighting is illustrative, not physical energy. Smoothing is adjusted within the animation; its slider is a display parameter, not a geodetic search radius. No choropleth classes or DBSCAN eps/min_samples apply to this animation. Query uses the current region bounding rectangle and magnitude/depth/time limits; missing or out-of-bounds records are not shown. This is neither shaking intensity nor a seismic-risk prediction.')
         with st.expander('How to interpret this animation'):
             st.markdown('''**Play time:** Events accumulate in recorded chronological order. The date slider lets you scrub the same dataset.\n\n**Play magnitude:** Raising the threshold hides smaller recorded events; it does not represent earthquakes growing stronger.\n\n**Event-count density:** Each event contributes equally. **Magnitude-weighted density:** Higher-magnitude events receive more weight using an illustrative transform, not physical seismic energy.\n\n**Smoothing:** Blends nearby epicenters into broader hotspots. Brighter areas mean greater displayed concentration, **not** measured shaking, damage, future probability or risk.\n\nUSGS geographic selection uses a bounding box; records and reporting coverage vary, and the downloaded query may be limited.''')
         # HAZARDSCOPE_ASSIGNMENT_GEOGRAPHY_V2: joined seismic geography (Earthquakes only)
@@ -211,8 +243,9 @@ with t3:
         # HAZARDSCOPE_DBSCAN_COORDINATED_BONUS_V1 · Earthquakes tab only
         from src.quake_bonus import render_coordinated, render_dbscan
         render_coordinated(quakes)
-        with st.expander('DBSCAN clustering · sensitivity analysis (bonus)', expanded=True):
-            render_dbscan(quakes, region_choice, bool((st.session_state.get('meta_quakes') or {}).get('truncated')))
+        if not st.session_state.get('haz_dbscan_focus'):
+            with st.expander('DBSCAN clustering · sensitivity analysis (bonus)', expanded=True):
+                render_dbscan(quakes, region_choice, bool((st.session_state.get('meta_quakes') or {}).get('truncated')))
         with st.expander('Explore individual earthquake epicenters (magnitude and depth)', expanded=False):
             fig=earthquake_map(quakes,marker_scale,show_map_density,heat_blur)
             st.plotly_chart(fig,width='stretch')
@@ -246,10 +279,16 @@ with t2:
     else:
         # LIGHTWEIGHT_WIND_CANVAS_V1: continuous 2D canvas, no Plotly frame redraw
         components.html(wind_canvas_html(wind, particle_count), height=515, scrolling=False)
+        # HAZARDSCOPE_ASSIGNMENT_CAPTIONS_V1: wind-streamline map
+        st.caption(f'**Wind streamline map:** 10-meter wind vectors from sampled model-grid coordinates; paths follow model wind direction and relative speed (number of particle traces: {particle_count}). Geographic context uses the selected approximate sampling rectangle; trajectories and playback speed are illustrative, not observed air parcels or elapsed forecast time. No choropleth classes, heatmap radius or DBSCAN parameters apply. Missing grid samples and locations outside the selected grid are not represented.')
         st.info('**What this shows:** Moving colored line segments represent particles advected through a single sampled 10-meter wind-vector field. The movement demonstrates wind direction and relative strength. Playback speed and particle paths are illustrative, not meteorological elapsed time.')
         st.plotly_chart(smoothed_wind_map(wind),width='stretch')
+        # HAZARDSCOPE_ASSIGNMENT_CAPTIONS_V1: wind-speed raster
+        st.caption('**Smoothed wind-speed field:** colored heatmap encodes sampled model wind speed (km/h) over longitude (x) and latitude (y), displayed as a geographic coordinate plane rather than a projected state choropleth. The continuous scale is not a classed quantile scheme; Plotly interpolates the visual appearance between grid samples (no physical heatmap radius or DBSCAN eps). Geographic coverage is limited to the sampled grid; display interpolation must not be interpreted as additional measured observations or real-time hazard probability.')
         surface=st.radio('Weather density surface',['Wind speed','Sea-level pressure'],horizontal=True)
         st.plotly_chart(wind_field_surface(wind,'speed' if surface=='Wind speed' else 'pressure'),width='stretch')
+        # HAZARDSCOPE_ASSIGNMENT_CAPTIONS_V1: scalar weather field
+        st.caption(f'**Weather scalar field:** geographic coordinate plane (longitude x-axis, latitude y-axis); colors encode sampled model {"wind speed in km/h" if surface == "Wind speed" else "mean sea-level pressure in hPa"}. Continuous numeric scale, not a classified choropleth; no spatial interpolation radius, DBSCAN eps or min_samples. Coverage and exclusions follow the finite grid samples selected above; this is a model field rather than station-observed disaster intensity.')
         st.caption('Surface values are sampled current weather-model fields on a longitude/latitude grid; the heatmap is not a physical wind gust warning or a direct measure of hazard risk.')
         l,r=st.columns(2)
         l.metric('Mean wind in sampled grid',f'{wind.speed.mean():.1f} km/h')
@@ -291,8 +330,12 @@ with t5:
         {'Source':'FEMA','Measure':'Distinct declared disasters','Count':f_count,'Time horizon':f'Since {fema_year}, latest ≤1,000 rows','Status':'Fetched' if fema is not None else 'Not fetched'},
     ])
     st.dataframe(summary,hide_index=True,width='stretch')
-    if weather:
-        cur,hour=weather
+    # HAZARDSCOPE_WEATHER_DYNAMIC_INSIGHTS_V2
+    cross_weather = weather if st.session_state.get("key_weather") == weather_key else None
+    if weather is not None and cross_weather is None:
+        st.caption("Weather query settings changed. Fetch Weather Data again to get the forecast for the new region or duration; previous values are hidden.")
+    if cross_weather:
+        cur,hour=cross_weather
         st.markdown('#### Point weather at approximate regional center')
         x,y,z=st.columns(3)
         x.metric('10 m wind',str(cur.get('wind_speed_10m','—'))+' km/h')
@@ -302,11 +345,37 @@ with t5:
         f=px.line(hour,x='time',y=metric,markers=False,template='plotly_dark',title='Hourly weather-model forecast at the approximate regional center')
         f.update_traces(line_color='#42e5b7',line_width=3)
         f.update_layout(paper_bgcolor=BG,plot_bgcolor=BG,height=380)
-        st.plotly_chart(f,width='stretch')
+        # HAZARDSCOPE_CROSS_SOURCE_WEATHER_AUTOPLAY_V1
+        from src.weather_timeline_animation import weather_timeline_html
+        components.html(weather_timeline_html(hour, metric), height=680, scrolling=False)
         st.caption('These are weather model estimates/forecasts for approximate coordinates, not observations from a regional sensor or a state average.')
-    else:st.info('Fetch weather from the sidebar to add the weather-and-pressure time series.')
+    else:
+        # HAZARDSCOPE_CROSS_SOURCE_BUTTONS_V1 · Only Cross-source Research UI changes.
+        if st.button('🌤 Fetch Weather Data & Show Time Series', key='haz_cross_fetch_weather',
+                     type='primary', width='stretch'):
+            def _cross_source_weather():
+                current, hourly, metadata = cache_weather(*weather_key)
+                return (current, hourly), metadata
+            do_fetch('weather', weather_key, _cross_source_weather)
+            if (st.session_state.get('data_weather') is not None
+                    and st.session_state.get('key_weather') == weather_key):
+                st.rerun()
+        st.caption('Fetches official Open-Meteo model weather for the currently selected region and forecast duration. Not a sensor observation.')
     st.markdown('#### Responsible interpretation')
-    st.info('A rise in reported events can reflect a changed reporting process, sampling window or detection threshold. A national comparison requires matched geography, source-specific denominators and consistent historical periods.')
+    guide_visible = bool(st.session_state.get('haz_cross_interpretation_visible', False))
+    if st.button('📖 Hide Interpretation Guide' if guide_visible else '📖 Show Interpretation Guide',
+                 key='haz_cross_interpretation_button', width='stretch'):
+        guide_visible = not guide_visible
+        st.session_state['haz_cross_interpretation_visible'] = guide_visible
+    if guide_visible:
+        st.markdown('''**How to compare these sources responsibly**
+
+- **USGS:** an event is a recorded earthquake in the selected time and geographic query window.
+- **NWS:** an event is an active alert record, not a counted disaster or observed impact.
+- **FEMA:** a distinct declaration is an administrative record, not a measure of physical hazard strength.
+- **Open-Meteo:** wind, pressure and temperature are weather-model outputs, not direct station observations.
+
+Reported counts can change with query bounds, time periods, detection thresholds and reporting practices. These sources use different definitions and denominators, so **do not interpret their raw counts as comparable risk measures**. Population-normalized earthquake rates appear in Tab 03 under Seismic Geography & Population Analysis.''')
 
 with t6:
     st.subheader('Evidence, source freshness & data quality')

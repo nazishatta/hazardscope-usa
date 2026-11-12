@@ -338,6 +338,8 @@ def render_alerts(alerts, metadata, region_choice):
             st.info('Selected warning has no focusable geographic polygon yet. Showing an overview; choose Load official NWS affected zones if available.')
         st.plotly_chart(fig,width='stretch',key='haz_nws_map')
         st.caption('Layers: supplied NWS alert boundaries shaded by official severity; selected affected-zone boundaries dashed in yellow. Focus view: padded Mercator extent based exclusively on official selected geometry. Overview: Albers USA. These are alert/zone coverage areas, not moving storms or precise hazard footprints. No guessed coordinates; polygon holes are not displayed.')
+        # HAZARDSCOPE_ASSIGNMENT_CAPTIONS_V1: map classification and exclusions
+        st.caption('**Map classification:** nominal NWS severity categories (categorical colors, not quantile classes); the number of visible severity categories depends on the fetched alerts. No heatmap smoothing radius or DBSCAN eps/min_samples apply. Alert and zone polygons are official geometry only; records without valid polygons remain in non-map views and are counted below. The map cannot infer omitted hazard footprints or physical impact boundaries.')
     else:
         st.info('No official polygon geometry is available for this selection. If affected-zone links are provided, select an alert and load its official NWS zones above; no area names are geocoded.')
     st.caption(f'{int(view.has_polygon.sum())} of {len(view)} selected warning records have official geographic polygons. Alerts without polygons remain visible in the timeline, matrix and details.')

@@ -115,5 +115,25 @@ el('smooth').addEventListener('input',e=>{smoothing=+e.target.value;repaint();})
 el('speed').addEventListener('change',()=>{if(playing){const kind=playing;stop();playing=kind;el('status').textContent='Playing '+kind;timer=setInterval(tick,+el('speed').value);}});
 let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(repaint,150)});
 window.addEventListener('pagehide',stop);document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+
+// HAZARDSCOPE_DBSCAN_PRESENTATION_FINAL_V4 · resume automatically when earthquake tab becomes visible.
+// A deliberate Pause stays paused until user presses Play; changing tabs is not a deliberate Pause.
+let hzManualPause=false;
+el('pause').addEventListener('click',()=>{hzManualPause=true;},true);
+el('timePlay').addEventListener('click',()=>{hzManualPause=false;},true);
+el('thresholdPlay').addEventListener('click',()=>{hzManualPause=false;},true);
+el('reset').addEventListener('click',()=>{hzManualPause=true;},true);
+function hzAutoplayIfVisible(){
+ if(!hzManualPause && !playing && !document.hidden){start('time');}
+}
+document.addEventListener('visibilitychange',()=>{
+ if(!document.hidden) window.setTimeout(hzAutoplayIfVisible,120);
+});
+if('IntersectionObserver' in window){
+ new IntersectionObserver(entries=>{
+  if(entries[0] && entries[0].isIntersecting)hzAutoplayIfVisible();
+ },{threshold:.01}).observe(document.querySelector('.stage'));
+}
+
 back.style.opacity='0';draw(front);start('time'); // HAZARDSCOPE_SEISMIC_AUTOPLAY_V1
 </script></body></html>
