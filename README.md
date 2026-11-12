@@ -10,12 +10,14 @@
 [![Launch dashboard](https://img.shields.io/badge/LAUNCH-LIVE%20HAZARDSCOPE%20USA-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://hazardscope-usa.streamlit.app/)
 [![Quick start](https://img.shields.io/badge/GET%20STARTED-RUN%20LOCALLY-16bea5?style=for-the-badge&logo=python&logoColor=white)](#run-locally)
 
-![Python](https://img.shields.io/badge/Python-3.13%20tested%20locally-3776AB?logo=python&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Streamlit-Multi--tab-FF4B4B?logo=streamlit&logoColor=white)
-![Plotly](https://img.shields.io/badge/Plotly-Interactive-3F4F75?logo=plotly&logoColor=white)
-![Geoanalysis](https://img.shields.io/badge/Geoanalysis-Census%20%2B%20ACS-187B9B)
-![Clustering](https://img.shields.io/badge/Clustering-DBSCAN-7259BC)
-![Data](https://img.shields.io/badge/Data-Official%20sources-168776)
+[![Python](https://img.shields.io/badge/Python-3.13%20tested%20locally-3776AB?logo=python&logoColor=white)](#run-locally)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Multi--tab-FF4B4B?logo=streamlit&logoColor=white)](https://hazardscope-usa.streamlit.app/)
+[![Plotly](https://img.shields.io/badge/Plotly-Interactive-3F4F75?logo=plotly&logoColor=white)](#coordinated-views--dbscan)
+[![Geoanalysis](https://img.shields.io/badge/Geoanalysis-Census%20%2B%20ACS-187B9B)](#the-geographic-analysis)
+[![Clustering](https://img.shields.io/badge/Clustering-DBSCAN-7259BC)](#coordinated-views--dbscan)
+[![Data](https://img.shields.io/badge/Data-Official%20sources-168776)](#official-data-sources--freshness)
+
+<sub>Click a badge to open its related feature or documentation. Gallery previews launch the live application.</sub>
 
 [**🚀 Open live dashboard**](https://hazardscope-usa.streamlit.app/) · [**Explore the workspaces**](#explore-the-six-workspaces) · [**Geographic methodology**](#the-geographic-analysis) · [**Interactive bonuses**](#coordinated-views--dbscan) · [**Data provenance**](#official-data-sources--freshness) · [**Deploy**](#deployment)
 
@@ -57,14 +59,14 @@ The images below are **cropped screenshots of actual local HazardScope sessions*
 
 <table>
 <tr>
-<td width="50%" valign="top"><a href="docs/assets/earthquake-density.jpg"><img src="docs/assets/earthquake-density.jpg" alt="Local HazardScope earthquake-density animation showing recorded event concentrations" width="100%"></a><br><strong>Seismic density</strong><br><sub>Recorded epicenters build into geographic concentration patterns.</sub></td>
-<td width="50%" valign="top"><a href="docs/assets/dbscan.jpg"><img src="docs/assets/dbscan.jpg" alt="Local HazardScope DBSCAN clustering map with grouped earthquake epicenters and gray noise points" width="100%"></a><br><strong>DBSCAN clustering</strong><br><sub>Compare geographic neighborhoods while retaining unclustered noise points.</sub></td>
+<td width="50%" valign="top"><a href="https://hazardscope-usa.streamlit.app/" title="Open the live interactive dashboard"><img src="docs/assets/earthquake-density.jpg" alt="Local HazardScope earthquake-density animation showing recorded event concentrations" width="100%"></a><br><strong>Seismic density</strong><br><sub>Recorded epicenters build into geographic concentration patterns.</sub></td>
+<td width="50%" valign="top"><a href="https://hazardscope-usa.streamlit.app/" title="Open the live interactive dashboard"><img src="docs/assets/dbscan.jpg" alt="Local HazardScope DBSCAN clustering map with grouped earthquake epicenters and gray noise points" width="100%"></a><br><strong>DBSCAN clustering</strong><br><sub>Compare geographic neighborhoods while retaining unclustered noise points.</sub></td>
 </tr>
 <tr>
-<td valign="top"><a href="docs/assets/coordinated.jpg"><img src="docs/assets/coordinated.jpg" alt="Linked daily earthquake counts and filtered magnitude-depth scatterplot" width="100%"></a><br><strong>Coordinated analysis</strong><br><sub>Select a day to update a second chart from the same USGS records.</sub></td>
-<td valign="top"><a href="docs/assets/windflow.jpg"><img src="docs/assets/windflow.jpg" alt="WindFlow visualization based on sampled model wind vectors" width="100%"></a><br><strong>WindFlow</strong><br><sub>Illustrative particles move through a sampled wind-vector field.</sub></td>
+<td valign="top"><a href="https://hazardscope-usa.streamlit.app/" title="Open the live interactive dashboard"><img src="docs/assets/coordinated.jpg" alt="Linked daily earthquake counts and filtered magnitude-depth scatterplot" width="100%"></a><br><strong>Coordinated analysis</strong><br><sub>Select a day to update a second chart from the same USGS records.</sub></td>
+<td valign="top"><a href="https://hazardscope-usa.streamlit.app/" title="Open the live interactive dashboard"><img src="docs/assets/windflow.jpg" alt="WindFlow visualization based on sampled model wind vectors" width="100%"></a><br><strong>WindFlow</strong><br><sub>Illustrative particles move through a sampled wind-vector field.</sub></td>
 </tr>
-<tr><td colspan="2" valign="top"><a href="docs/assets/forecast.jpg"><img src="docs/assets/forecast.jpg" alt="Animated hourly forecast chart for a selected weather metric" width="100%"></a><br><strong>Hourly weather-model forecast</strong><br><sub>Playback walks through hourly model values; it does not imply live measured weather movement.</sub></td></tr>
+<tr><td colspan="2" valign="top"><a href="https://hazardscope-usa.streamlit.app/" title="Open the live interactive dashboard"><img src="docs/assets/forecast.jpg" alt="Animated hourly forecast chart for a selected weather metric" width="100%"></a><br><strong>Hourly weather-model forecast</strong><br><sub>Playback walks through hourly model values; it does not imply live measured weather movement.</sub></td></tr>
 </table>
 
 > **Screenshots are snapshots, not fixed results.** The values shown can differ after refresh, changing filters, or retrieving a new forecast.
