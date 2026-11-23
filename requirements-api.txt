@@ -1,0 +1,9 @@
+# HazardScope USA Week 12 FastAPI server environment.
+# Install from repository root: python -m pip install -r requirements-api.txt
+# The saved v0.1 joblib artifact was trained with scikit-learn 1.8.0.
+-r requirements.txt
+scikit-learn==1.8.0
+fastapi==0.165.0
+uvicorn==0.54.0
+httpx==0.28.1
+joblib==1.6.0
